@@ -101,12 +101,17 @@ app.get('/todos/:id', function(req, res) {
 
 app.delete('/todos/:id', function(req, res) {
 	var todoId = parseInt(req.params.id, 10);
-	db.todo.findById(todoId).then(function(todo) {
-		if (!!todo) {
-			db.todo = _.without(db.todos, todo)
-			return res.json(todo.toJSON())
+	db.todo.destroy({
+		where: {
+			id: todoId
+		}
+	}).then(function(rowsDeleted) {
+		if (rowsDeleted) {
+			return res.status(204).send();
 		} else {
-			return res.status(404).send()
+			return res.status(404).json({
+				error: 'No todo with that ID'
+			});
 		}
 	}).catch(function(e) {
 		return res.status(404).json(e)
