@@ -38,7 +38,7 @@ app.get('/todos', middleware.requireAuthentication, function(req, res) {
 		where: where
 	}).then(function(todos) {
 		return res.json(todos)
-	}).catch(function(e) {
+	}, function(e) {
 		return res.status(500).json(e)
 	});
 });
@@ -50,13 +50,15 @@ app.get('/todos/:id', middleware.requireAuthentication, function(req, res) {
 		id: todoId
 	};
 
-	db.todo.findOne({where: where}).then(function(todo) {
+	db.todo.findOne({
+		where: where
+	}).then(function(todo) {
 		if (!!todo) {
 			return res.json(todo.toJSON())
 		} else {
 			return res.status(404).send()
 		}
-	}).catch(function(e) {
+	}, function(e) {
 		return res.status(500).json(e)
 	});
 });
@@ -76,7 +78,7 @@ app.delete('/todos/:id', middleware.requireAuthentication, function(req, res) {
 				error: 'No todo with that ID'
 			});
 		}
-	}).catch(function(e) {
+	}, function(e) {
 		return res.status(404).json(e)
 	});
 });
@@ -98,7 +100,9 @@ app.put('/todos/:id', middleware.requireAuthentication, function(req, res) {
 		attributes.description = body.description;
 	}
 
-	db.todo.findOne({where: where}).then(function(todo) {
+	db.todo.findOne({
+		where: where
+	}).then(function(todo) {
 		if (todo) {
 			todo.update(attributes).then(function(todo) {
 				res.json(todo.toJSON());
@@ -122,7 +126,7 @@ app.post('/todos', middleware.requireAuthentication, function(req, res) {
 		}).then(function(todo) {
 			res.json(todo.toJSON())
 		});
-	}).catch(function(e) {
+	}, function(e) {
 		return res.status(400).json(e)
 	});
 });
@@ -139,21 +143,31 @@ app.post('/users', function(req, res) {
 
 app.post('/users/login', function(req, res) {
 	var body = _.pick(req.body, 'email', 'password');
+	var userInstance;
 
 	db.user.authenticate(body).then(function(user) {
 		var token = user.generateToken('authentication')
-		if (!token) {
-			res.status(401).send();
-		}
-		res.header('Auth', token).json(user.toPublicJSON());
+		userInstance = user;
+		return db.token.create({
+			token: token
+		});
+	}).then(function(tokenInstance) {
+		res.header('Auth', tokenInstance.get('token')).json(userInstance.toPublicJSON());
 	}, function() {
 		res.status(401).send();
 	});
 });
 
-db.sequelize.sync({
-	//	force: true
-}).then(function() {
+app.delete('/users/login', middleware.requireAuthentication, function(req, res) {
+	req.token.destroy().then(function() {
+		res.status(204).send();
+	}, function() {
+		res.status(500).send();
+	});
+});
+
+
+db.sequelize.sync().then(function() {
 	app.listen(PORT, function() {
 		console.log('Express listening on port ' + PORT + '!');
 	});
